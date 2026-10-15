@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorteador TCG - Roletas de Prêmios & Acidentes</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- JS Confetti para efeito de celebração -->
+    <script src="https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js"></script>
+    <!-- Google Fonts: Orbitron e Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Orbitron', 'sans-serif'],
+                    },
+                    colors: {
+                        tcgGold: '#fbbf24',
+                        tcgPurp: '#8b5cf6',
+                        tcgDark: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background: radial-gradient(circle at top, #1e1b4b, #0f172a, #020617);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+
+        /* Canvas glowing & shadow effects */
+        .wheel-container {
+            position: relative;
+            filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.6));
+        }
+
+        /* Marker/Pointer Style */
+        .wheel-pointer {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 32px solid #f43f5e;
+            z-index: 20;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        /* Glow animation for buttons */
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.8); }
+        }
+        
+        .glow-button-prizes {
+            animation: pulseGlow 2s infinite;
+        }
+
+        @keyframes pulseGlowRed {
+            0%, 100% { box-shadow: 0 0 15px rgba(225, 29, 72, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(225, 29, 72, 0.8); }
+        }
+
+        .glow-button-accidents {
+            animation: pulseGlowRed 2s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col justify-between font-sans antialiased">
+
+    <!-- Header Section -->
+    <header class="w-full py-6 px-4 text-center border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-6xl mx-mx-auto flex flex-col md:flex-row items-center justify-between gap-4 px-4">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-dice-d20 text-3xl text-amber-400 animate-spin-slow"></i>
+                <h1 class="font-display font-black text-2xl md:text-3xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-400 to-rose-500 uppercase">
+                    TCG Fate Spinner
+                </h1>
+            </div>
+            
+            <!-- Selector Tabs for Mobile / View Modes -->
+            <div class="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+                <button id="tab-all" onclick="switchTab('all')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-amber-500 text-slate-950 shadow-md">
+                    <i class="fa-solid fa-columns mr-1"></i> Ambas
+                </button>
+                <button id="tab-prizes" onclick="switchTab('prizes')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-trophy mr-1"></i> Prêmios
+                </button>
+                <button id="tab-accidents" onclick="switchTab('accidents')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-skull-crossbones mr-1"></i> Acidentes
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-8">
+        
+        <div id="wheels-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+
+            <!-- ROLETA 1: PRÊMIOS -->
+            <section id="section-prizes" class="flex flex-col items-center bg-slate-900/40 border border-amber-500/20 rounded-2xl p-6 md:p-8 backdrop-blur-sm transition-all">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="p-2 bg-amber-500/10 rounded-lg text-amber-400">
+                        <i class="fa-solid fa-trophy text-2xl"></i>
+                    </span>
+                    <h2 class="font-display text-2xl font-bold tracking-wide text-amber-400 uppercase">
+                        Prêmios
+                    </h2>
+                </div>
+                <p class="text-xs md:text-sm text-slate-400 mb-6 text-center">Tire a sorte grande e expanda sua coleção com booster, cartas raras e decks!</p>
+
+                <!-- Canvas da Roleta 1 -->
+                <div class="wheel-container mb-6">
+                    <div class="wheel-pointer"></div>
+                    <canvas id="canvas-prizes" width="380" height="380" class="max-w-full h-auto cursor-pointer"></canvas>
+                </div>
+
+                <!-- Botão de Giro -->
+                <button id="btn-spin-prizes" onclick="spinWheel('prizes')" class="glow-button-prizes w-full max-w-xs py-4 px-6 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-display font-black text-lg tracking-wider uppercase rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrows-spin text-xl"></i> Girar Prêmios
+                </button>
+
+                <!-- Lista de Itens da Roleta -->
+                <div class="w-full mt-8 border-t border-slate-800 pt-6">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Opções da Roleta:</h3>
+                    <ul id="list-prizes" class="space-y-2 text-sm text-slate-300">
+                        <!-- Preenchido dinamicamente pelo JS -->
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ROLETA 2: ACIDENTES -->
+            <section id="section-accidents" class="flex flex-col items-center bg-slate-900/40 border border-rose-500/20 rounded-2xl p-6 md:p-8 backdrop-blur-sm transition-all">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="p-2 bg-rose-500/10 rounded-lg text-rose-400">
+                        <i class="fa-solid fa-skull-crossbones text-2xl"></i>
+                    </span>
+                    <h2 class="font-display text-2xl font-bold tracking-wide text-rose-400 uppercase">
+                        Acidentes
+                    </h2>
+                </div>
+                <p class="text-xs md:text-sm text-slate-400 mb-6 text-center">A sorte nem sempre sorri. Enfrente os reveses e perdas da jornada TCG.</p>
+
+                <!-- Canvas da Roleta 2 -->
+                <div class="wheel-container mb-6">
+                    <div class="wheel-pointer"></div>
+                    <canvas id="canvas-accidents" width="380" height="380" class="max-w-full h-auto cursor-pointer"></canvas>
+                </div>
+
+                <!-- Botão de Giro -->
+                <button id="btn-spin-accidents" onclick="spinWheel('accidents')" class="glow-button-accidents w-full max-w-xs py-4 px-6 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white font-display font-black text-lg tracking-wider uppercase rounded-xl transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrows-spin text-xl"></i> Girar Acidentes
+                </button>
+
+                <!-- Lista de Itens da Roleta -->
+                <div class="w-full mt-8 border-t border-slate-800 pt-6">
+                    <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Opções da Roleta:</h3>
+                    <ul id="list-accidents" class="space-y-2 text-sm text-slate-300">
+                        <!-- Preenchido dinamicamente pelo JS -->
+                    </ul>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-6 border-t border-slate-800 text-center text-xs text-slate-500">
+        <p>Desenvolvido para sorteios de TCG &bull; Pronto para hospedagem no GitHub Pages</p>
+    </footer>
+
+    <!-- MODAL DE RESULTADO -->
+    <div id="result-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl transform scale-95 transition-transform duration-300 relative overflow-hidden" id="modal-card">
+            
+            <!-- Elemento decorativo de brilho de fundo -->
+            <div id="modal-glow" class="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div id="modal-icon-container" class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+                <i id="modal-icon" class="fa-solid fa-award"></i>
+            </div>
+
+            <h3 id="modal-category" class="font-display text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">
+                Categoria
+            </h3>
+            
+            <h2 id="modal-title" class="text-xl md:text-2xl font-bold text-white mb-4">
+                Título do Evento
+            </h2>
+
+            <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4 mb-6">
+                <p class="text-xs uppercase text-slate-500 font-semibold mb-1">Efeito / Consequência:</p>
+                <p id="modal-reward" class="text-lg font-bold text-amber-400">
+                    Recompensa ou Punição
+                </p>
+            </div>
+
+            <button onclick="closeModal()" class="w-full py-3 px-6 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl transition-colors border border-slate-700">
+                Entendido!
+            </button>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT DA APLICAÇÃO -->
+    <script>
+        // Dados das Roletas
+        const wheelsData = {
+            prizes: {
+                title: "Prêmios",
+                colorScheme: ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6"],
+                items: [
+                    { title: "Teve 3 notas 10 no boletim", reward: "10 booster do ano", icon: "fa-graduation-cap" },
+                    { title: "Amigo mais velho parou de jogar", reward: "2 UR do ano", icon: "fa-user-clock" },
+                    { title: "Ganhou aposta do colega", reward: "2 SR do ano", icon: "fa-handshake" },
+                    { title: "Presente da avó!!!", reward: "1 starter deck do ano (apenas 1 por ano)", icon: "fa-gift" }
+                ]
+            },
+            accidents: {
+                title: "Acidentes",
+                colorScheme: ["#ef4444", "#f97316", "#dc2626", "#b91c1c"],
+                items: [
+                    { title: "Mãe assistiu Gilberto Barros", reward: "Perca uma UR", icon: "fa-tv" },
+                    { title: "Colega roubou sua carta", reward: "Perca uma SR", icon: "fa-mask" },
+                    { title: "Proposta do primo mais velho", reward: "Perca uma UR; ganhe uma SR", icon: "fa-comments" },
+                    { title: "Ficou de castigo!", reward: "Substitua 10 cartas do último deck que usou (mín. 1 UR e 2 SR)", icon: "fa-triangle-exclamation" }
+                ]
+            }
+        };
+
+        // Estado das Roletas
+        const state = {
+            prizes: { angle: 0, isSpinning: false, canvas: null, ctx: null },
+            accidents: { angle: 0, isSpinning: false, canvas: null, ctx: null }
+        };
+
+        const jsConfetti = new JSConfetti();
+
+        // Inicialização
+        window.onload = () => {
+            initWheel('prizes');
+            initWheel('accidents');
+            populateLists();
+        };
+
+        // Áudio Sintético (Sem arquivos externos para garantir funcionamento em qualquer lugar)
+        function playTickSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.04);
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.04);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.04);
+            } catch(e) {}
+        }
+
+        function playWinSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const notes = [261.63, 329.63, 392.00, 523.25];
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.1);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime + idx * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.1 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + idx * 0.1);
+                    osc.stop(ctx.currentTime + idx * 0.1 + 0.3);
+                });
+            } catch(e) {}
+        }
+
+        function playLossSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const notes = [300, 260, 220, 150];
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime + idx * 0.12);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.2);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + idx * 0.12);
+                    osc.stop(ctx.currentTime + idx * 0.12 + 0.2);
+                });
+            } catch(e) {}
+        }
+
+        // Configuração da Canvas e Renderização
+        function initWheel(key) {
+            const canvas = document.getElementById(`canvas-${key}`);
+            const ctx = canvas.getContext('2d');
+            state[key].canvas = canvas;
+            state[key].ctx = ctx;
+
+            // Ajuste para telas retina/high-DPI
+            const dpr = window.devicePixelRatio || 1;
+            const size = 380;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            canvas.style.width = `${size}px`;
+            canvas.style.height = `${size}px`;
+            ctx.scale(dpr, dpr);
+
+            drawWheel(key);
+        }
+
+        function drawWheel(key) {
+            const { ctx, angle } = state[key];
+            const data = wheelsData[key];
+            const items = data.items;
+            const totalSlices = items.length;
+            const sliceAngle = (2 * Math.PI) / totalSlices;
+            const center = 190;
+            const radius = 175;
+
+            ctx.clearRect(0, 0, 380, 380);
+
+            // Borda Externa Gloriosa
+            ctx.beginPath();
+            ctx.arc(center, center, radius + 5, 0, 2 * Math.PI);
+            ctx.fillStyle = key === 'prizes' ? '#d97706' : '#9f1239';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(center, center, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#0f172a';
+            ctx.fill();
+
+            // Desenho de cada fatia
+            for (let i = 0; i < totalSlices; i++) {
+                const startAngle = angle + i * sliceAngle;
+                const endAngle = startAngle + sliceAngle;
+
+                // Fatia
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, radius - 4, startAngle, endAngle);
+                ctx.closePath();
+
+                ctx.fillStyle = data.colorScheme[i % data.colorScheme.length];
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#0f172a';
+                ctx.stroke();
+
+                // Texto e Conteúdo
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(startAngle + sliceAngle / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Inter, sans-serif';
+                ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                ctx.shadowBlur = 4;
+
+                // Truncar texto para caber no setor se necessário
+                let text = items[i].title;
+                if (text.length > 22) text = text.substring(0, 20) + '...';
+                
+                ctx.fillText(text, radius - 25, 4);
+                ctx.restore();
+            }
+
+            // Centro da Roleta (Miolo)
+            ctx.beginPath();
+            ctx.arc(center, center, 32, 0, 2 * Math.PI);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = key === 'prizes' ? '#fbbf24' : '#f43f5e';
+            ctx.stroke();
+
+            // Ícone central
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px "Font Awesome 6 Free"';
+            ctx.fontWeight = '900';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const iconUnicode = key === 'prizes' ? '\uf091' : '\uf714'; // Trophy ou Skull
+            ctx.fillText(iconUnicode, center, center);
+        }
+
+        // Lógica de Giro
+        function spinWheel(key) {
+            if (state[key].isSpinning) return;
+
+            state[key].isSpinning = true;
+            document.getElementById(`btn-spin-${key}`).disabled = true;
+            document.getElementById(`btn-spin-${key}`).classList.add('opacity-50', 'cursor-not-allowed');
+
+            const items = wheelsData[key].items;
+            const sliceAngle = (2 * Math.PI) / items.length;
+
+            // Define rotação total (pelo menos 5 giros completos + offset aleatório)
+            const extraRotations = 5 + Math.floor(Math.random() * 5);
+            const randomTargetIndex = Math.floor(Math.random() * items.length);
+            
+            // O ponteiro fica no topo (-Math.PI / 2). Calculamos o ângulo final para alinhar o item escolhido no topo.
+            const targetSliceMiddle = (randomTargetIndex * sliceAngle) + (sliceAngle / 2);
+            const targetAngle = (3 * Math.PI / 2) - targetSliceMiddle + (extraRotations * 2 * Math.PI);
+
+            const startAngle = state[key].angle % (2 * Math.PI);
+            const totalDelta = targetAngle - startAngle;
+            
+            const duration = 4500; // Duração em ms
+            const startTime = performance.now();
+            let lastSectorIndex = -1;
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Easing out cubic para desaceleração realista
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                state[key].angle = startAngle + totalDelta * easeOut;
+                drawWheel(key);
+
+                // Efeito sonoro a cada fatia percorrida
+                const normalizedAngle = (2 * Math.PI - (state[key].angle % (2 * Math.PI))) % (2 * Math.PI);
+                const currentSector = Math.floor((normalizedAngle + Math.PI / 2) % (2 * Math.PI) / sliceAngle);
+                
+                if (currentSector !== lastSectorIndex) {
+                    playTickSound();
+                    lastSectorIndex = currentSector;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    state[key].isSpinning = false;
+                    document.getElementById(`btn-spin-${key}`).disabled = false;
+                    document.getElementById(`btn-spin-${key}`).classList.remove('opacity-50', 'cursor-not-allowed');
+                    
+                    // Finalizado - Mostra resultado
+                    showResult(key, items[randomTargetIndex]);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Exibição do Modal de Resultado
+        function showResult(type, item) {
+            const modal = document.getElementById('result-modal');
+            const card = document.getElementById('modal-card');
+            const category = document.getElementById('modal-category');
+            const title = document.getElementById('modal-title');
+            const reward = document.getElementById('modal-reward');
+            const iconContainer = document.getElementById('modal-icon-container');
+            const icon = document.getElementById('modal-icon');
+            const glow = document.getElementById('modal-glow');
+
+            category.innerText = type === 'prizes' ? 'Prêmio Sorteado!' : 'Acidente Aconteceu!';
+            title.innerText = item.title;
+            reward.innerText = item.reward;
+
+            // Estilização condicional do Modal
+            if (type === 'prizes') {
+                iconContainer.className = "w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center text-3xl bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                icon.className = `fa-solid ${item.icon}`;
+                reward.className = "text-lg font-bold text-amber-400";
+                glow.className = "absolute -top-24 -left-24 w-48 h-48 bg-amber-500/30 rounded-full blur-3xl pointer-events-none";
+                
+                // Confete e som de vitória
+                jsConfetti.addConfetti({
+                    emojis: ['⚡', '✨', '🎴', '🎁'],
+                    confettiNumber: 60,
+                });
+                playWinSound();
+
+            } else {
+                iconContainer.className = "w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center text-3xl bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                icon.className = `fa-solid ${item.icon}`;
+                reward.className = "text-lg font-bold text-rose-400";
+                glow.className = "absolute -top-24 -left-24 w-48 h-48 bg-rose-500/30 rounded-full blur-3xl pointer-events-none";
+                
+                playLossSound();
+            }
+
+            // Exibe modal com transição
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('result-modal');
+            const card = document.getElementById('modal-card');
+
+            modal.classList.add('opacity-0');
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // Preenche as listas de descrição abaixo das roletas
+        function populateLists() {
+            ['prizes', 'accidents'].forEach(type => {
+                const ul = document.getElementById(`list-${type}`);
+                ul.innerHTML = '';
+                wheelsData[type].items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = "flex items-start gap-2 bg-slate-800/40 p-2.5 rounded-lg border border-slate-800/80";
+                    li.innerHTML = `
+                        <i class="fa-solid ${item.icon} ${type === 'prizes' ? 'text-amber-400' : 'text-rose-400'} mt-1"></i>
+                        <div>
+                            <span class="font-semibold text-slate-200">${item.title}</span>
+                            <span class="block text-xs ${type === 'prizes' ? 'text-amber-300' : 'text-rose-300'} font-medium">↳ ${item.reward}</span>
+                        </div>
+                    `;
+                    ul.appendChild(li);
+                });
+            });
+        }
+
+        // Alternância de Abas para Visualização
+        function switchTab(mode) {
+            const prizesSec = document.getElementById('section-prizes');
+            const accidentsSec = document.getElementById('section-accidents');
+            
+            const btnAll = document.getElementById('tab-all');
+            const btnPrizes = document.getElementById('tab-prizes');
+            const btnAccidents = document.getElementById('tab-accidents');
+
+            // Reset botão styles
+            [btnAll, btnPrizes, btnAccidents].forEach(btn => {
+                btn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 text-slate-400 hover:text-white";
+            });
+
+            if (mode === 'all') {
+                btnAll.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-amber-500 text-slate-950 shadow-md";
+                prizesSec.classList.remove('hidden');
+                accidentsSec.classList.remove('hidden');
+            } else if (mode === 'prizes') {
+                btnPrizes.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-amber-500 text-slate-950 shadow-md";
+                prizesSec.classList.remove('hidden');
+                accidentsSec.classList.add('hidden');
+            } else if (mode === 'accidents') {
+                btnAccidents.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 bg-rose-600 text-white shadow-md";
+                prizesSec.classList.add('hidden');
+                accidentsSec.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
